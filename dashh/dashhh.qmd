@@ -1,0 +1,335 @@
+--- 
+title: "Development Indicators by Continent"
+author: "Gapminder Analytics Group"
+format: 
+    dashboard:
+        theme: yeti
+        orientation: rows
+        expandable: true
+        scrolling: true
+--- 
+
+# 1. 소개 & 데이터 처리 과정
+
+```{python}
+import pandas as pd
+import plotly.express as px
+our_df = pd.read_csv("../data/ames.csv")
+```
+
+
+![](img/us.png)
+
+## 
+🎯 아이오와 대학교에 합격한 우리! 쉐어하우스를 구하자!
+
+- 🎓 **학교 근처여야 함(2km 이내)**  
+- 💰 **월세는 저렴할수록 좋음**  
+- 🛏️ **방/욕실 수는 2개 이상**  
+- 🔥 **에어컨 / 난방은 필수!**  
+- 🏠 **2층 이상 / 넓은 1층 필요**  
+- 🍽️ **주방 1개 이상 & 퀄리티 보통 이상**  
+- 🚗 **차 1대 이상 주차 가능**  
+- 🧱 **집 컨디션은 보통 이상**  
+- 🛣️ **도로는 포장되어 있어야 함**  
+- 🏞️ **🏃‍♀️ 공원이 가까이에 있어야 함**  
+
+
+
+## 
+✨ 데이터 소개
+
+- **데이터 건수**: 약 2500건
+- **컬럼 수**: 약 85개
+- **주요 컬럼**: `BedroomAbvGr`, `TotalFullBath`, `GarageCars`, `HouseStyle`, `KitchenQual`, `SalePrice` 등
+- **분석 대상**: 유학생 쉐어하우스를 위한 주택 조건 분석
+
+
+
+##
+### 🚽 화장실 수 통합
+
+- `FullBath`, `HalfBath`, `BsmtFullBath`, `BsmtHalfBath` → `TotalFullBath`, `TotalHalfBath`
+- `HalfBath`는 0.5개로 간주 (세면대 + 변기만 있는 구조)
+
+```{python}
+our_df["TotalFullBath"] = our_df["FullBath"] + our_df["BsmtFullBath"]
+our_df["TotalHalfBath"] = 0.5 * (our_df["HalfBath"] + our_df["BsmtHalfBath"])
+```
+
+
+::: {.bath-style-grid}
+<div class="grid">
+
+<div class="item">
+  <img src="img/halfbath.png" alt="1Story" />
+</div>
+
+<div class="item">
+  <img src="img/fullbath.png" alt="1.5Fin" />
+</div>
+
+</div>
+:::
+
+<style>
+.bath-style-grid .grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  text-align: center;
+}
+
+.bath-style-grid .item img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 0 6px rgba(0,0,0,0.1);
+}
+
+.bath-style-grid .item p {
+  margin-top: 8px;
+  font-size: 0.9rem;
+}
+</style>
+
+
+### 🏠 HouseStyle 단순화 (2층 여부 기준)
+
+- 2층 이상 구조를 `Satisfied`, 1층은 `Unsatisfied`, 나머지는 `Others`로 단순화
+- 이유: 공간 분리 및 유학생 선호 구조 반영
+- 시각자료: 아래에 집 스타일별 이미지 포함
+
+```{python}
+def classify_style(style):
+    if style in ['1.5Fin', '2Story', '2.5Fin', '2.5Unf']:
+        return 'Satisfied'
+    elif style in ['1Story', '1.5Unf']:
+        return 'Unsatisfied'
+    else:
+        return 'Others'
+
+our_df["HouseStyleEval"] = our_df["HouseStyle"].apply(classify_style)
+```
+
+::: {.house-style-grid}
+<div class="grid">
+
+<div class="item">
+  <img src="img/1story.png" alt="1Story" />
+  <p><strong>1Story</strong><br>1층 구조</p>
+</div>
+
+<div class="item">
+  <img src="img/1_5fin.png" alt="1.5Fin" />
+  <p><strong>1.5Fin</strong><br>1.5층, 위층 마감</p>
+</div>
+
+<div class="item">
+  <img src="img/1_5unf.png" alt="1.5Unf" />
+  <p><strong>1.5Unf</strong><br>1.5층, 위층 미완공</p>
+</div>
+
+<div class="item">
+  <img src="img/2story.png" alt="2Story" />
+  <p><strong>2Story</strong><br>전형적인 2층 집</p>
+</div>
+
+<div class="item">
+  <img src="img/2_5fin.png" alt="2.5Fin" />
+  <p><strong>2.5Fin</strong><br>2.5층, 다락 마감</p>
+</div>
+
+<div class="item">
+  <img src="img/2_unf.png" alt="2.5Unf" />
+  <p><strong>2.5Unf</strong><br>2.5층, 다락 미완공</p>
+</div>
+
+<div class="item">
+  <img src="img/sfoyer.png" alt="SFoyer" />
+  <p><strong>SFoyer</strong><br>Split Foyer 구조</p>
+</div>
+
+<div class="item">
+  <img src="img/slvl.png" alt="SLvl" />
+  <p><strong>SLvl</strong><br>Split Level 구조</p>
+</div>
+
+</div>
+:::
+
+<style>
+.house-style-grid .grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  text-align: center;
+}
+
+.house-style-grid .item img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 0 6px rgba(0,0,0,0.1);
+}
+
+.house-style-grid .item p {
+  margin-top: 8px;
+  font-size: 0.9rem;
+}
+</style>
+
+##
+### 
+🏫 학교와의 거리 변수 추가
+
+- `Latitude`, `Longitude`를 이용해 **Iowa State University 중심까지의 거리(`dist_to_ISU`)** 계산
+- 학업/생활의 편의성을 고려해 거리 기반 변수 추가  
+- 해당 변수는 **주거지 선택에 있어 중요한 입지 요소**로 활용될 수 있음
+- `dist_to_ISU`는 각 주택이 ISU 중심에서 **몇 km 떨어져 있는지를 나타내는 연속형 변수**로, 향후 주거 선호도 분석 등에 활용 가능
+
+```{python}
+from geopy.distance import geodesic
+
+isu_lat = 42.0267
+isu_lon = -93.6465
+
+import numpy as np
+
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371.0  # Earth radius in km
+    phi1 = np.radians(lat1)
+    phi2 = np.radians(lat2)
+    delta_phi = np.radians(lat2 - lat1)
+    delta_lambda = np.radians(lon2 - lon1)
+    a = np.sin(delta_phi / 2.0) ** 2 + np.cos(phi1) * np.cos(phi2) * np.sin(delta_lambda / 2.0) ** 2
+    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+    return R * c * 1000  # return distance in meters
+
+our_df['dist_to_ISU'] = our_df.apply(
+    lambda row: haversine(row['Latitude'], row['Longitude'], isu_lat, isu_lon),
+    axis=1
+)
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+sns.histplot(our_df["dist_to_ISU"], kde=True)
+plt.title("Distribution of Distance to ISU")
+plt.xlabel("Distance to ISU (km)")
+plt.ylabel("Count")
+plt.show()
+```
+
+
+
+
+
+
+# 2. EDA
+
+## 🔢 문자형 → 숫자형 처리
+
+- `KitchenQual`, `HeatingQC`, `Street`, `CentralAir` 등
+- 범주형 → 더미 변수 또는 평준화 처리
+
+```{python}
+our_df = pd.get_dummies(our_df, columns=['KitchenQual', 'HeatingQC', 'Street', 'CentralAir'], drop_first=True)
+```
+
+
+## 
+```{python}
+import pandas as pd
+import plotly.graph_objects as go
+
+# 데이터 불러오기
+our_df = pd.read_csv("../data/ames.csv")
+
+# 제외하고 싶은 컬럼
+exclude_cols = ['Longitude', 'Latitude', 'dist_to_ISU', 'GarageArea', 'PID', 'SalePrice']
+
+# 수치형 변수만 추출 + 제외 컬럼 제거
+numeric_cols = our_df.select_dtypes(include='number').columns.tolist()
+numeric_cols = [col for col in numeric_cols if col not in exclude_cols]
+
+# 기본 설정
+x_var = numeric_cols[0]
+y_var = numeric_cols[1]
+
+fig = go.Figure()
+
+fig = fig.add_trace(
+    go.Scatter(
+        x=our_df[x_var],
+        y=our_df[y_var],
+        mode='markers',
+        marker=dict(color='skyblue', size=8, line=dict(width=1, color='DarkSlateGrey')),
+        text=our_df['HouseStyle'],
+        name=f'{x_var} vs {y_var}'
+    )
+)
+
+fig.update_layout(
+    title='🏡 주요 수치형 변수 간 관계 시각화',
+    template='plotly_white',
+    width=750,
+    height=600,
+    xaxis_title=x_var,
+    yaxis_title=y_var,
+    margin=dict(t=100, b=180),
+    updatemenus=[
+        dict(
+            buttons=[
+                dict(label=col, method='update',
+                     args=[{'x': [our_df[col]]}, {'xaxis.title': col}])
+                for col in numeric_cols
+            ],
+            direction='down',
+            showactive=True,
+            x=0.2,
+            xanchor='left',
+            y=-0.3,
+            yanchor='bottom'
+        ),
+        dict(
+            buttons=[
+                dict(label=col,
+                     method='update',
+                     args=[{'y': [our_df[col]]}, {'yaxis.title': col}])
+                for col in numeric_cols
+            ],
+            direction='down',
+            showactive=True,
+            x=0.7,
+            xanchor='left',
+            y=-0.3,
+            yanchor='bottom'
+        )
+    ],
+    annotations=[
+        dict(text="📌 X 변수 선택:", x=0.05, y=-0.28, xref="paper", yref="paper", showarrow=False),
+        dict(text="📌 Y 변수 선택:", x=0.58, y=-0.28, xref="paper", yref="paper", showarrow=False)
+    ]
+)
+
+```
+
+
+
+
+
+# 3. 회귀분석
+
+
+
+
+# 4. 지도 시각화
+
+
+
+
+# 5. 최종 분석
+
+
+
