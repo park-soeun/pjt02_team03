@@ -92,5 +92,5 @@ for _, row in df.iterrows():
         popup=f"Score: {row['score']:.1f}"
     ).add_to(score_map)
 
-score_map
+score_map.save('score_map.html')
 ```

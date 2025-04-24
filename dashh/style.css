@@ -1,0 +1,40 @@
+.updatemenu-item-rect {
+    width: 150px;
+}
+
+.updatemenu-item-rect {
+    width: 150px;
+}
+
+.updatemenu-item-text {
+    width: 150px;
+}
+
+.plot-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.scrollbox-bg {
+    width: 150px;
+}
+
+.house-style-grid .grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+    text-align: center;
+  }
+  
+  .house-style-grid .item img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 0 6px rgba(0,0,0,0.1);
+  }
+  
+  .house-style-grid .item p {
+    margin-top: 8px;
+    font-size: 0.9rem;
+  }

@@ -1,30 +1,44 @@
 --- 
-title: "Development Indicators by Continent"
-author: "Gapminder Analytics Group"
+title: "ISU 유학생들의 집 찾기"
+author: "3조"
 format: 
     dashboard:
         theme: yeti
-        orientation: rows
-        expandable: true
         scrolling: true
+        code-fold: true
+        css: style.css
+
 --- 
 
 # 1. 소개 & 데이터 처리 과정
 
 ```{python}
+import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.linear_model import LassoCV
+from sklearn.preprocessing import StandardScaler
+import plotly.graph_objects as go
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.linear_model import ElasticNet
+from sklearn.metrics import mean_squared_error
+from sklearn.metrics import root_mean_squared_error
+import folium
 import plotly.express as px
-our_df = pd.read_csv("../data/ames.csv")
+ames = pd.read_csv("../data/ames.csv")
 ```
 
 
 ![](img/us.png)
 
-## 
-🎯 아이오와 대학교에 합격한 우리! 쉐어하우스를 구하자!
+##
 
 - 🎓 **학교 근처여야 함(2km 이내)**  
-- 💰 **월세는 저렴할수록 좋음**  
+- 💰 **집값은 저렴할수록 좋음**  
 - 🛏️ **방/욕실 수는 2개 이상**  
 - 🔥 **에어컨 / 난방은 필수!**  
 - 🏠 **2층 이상 / 넓은 1층 필요**  
@@ -32,74 +46,21 @@ our_df = pd.read_csv("../data/ames.csv")
 - 🚗 **차 1대 이상 주차 가능**  
 - 🧱 **집 컨디션은 보통 이상**  
 - 🛣️ **도로는 포장되어 있어야 함**  
-- 🏞️ **🏃‍♀️ 공원이 가까이에 있어야 함**  
 
 
 
 ## 
-✨ 데이터 소개
 
 - **데이터 건수**: 약 2500건
 - **컬럼 수**: 약 85개
 - **주요 컬럼**: `BedroomAbvGr`, `TotalFullBath`, `GarageCars`, `HouseStyle`, `KitchenQual`, `SalePrice` 등
 - **분석 대상**: 유학생 쉐어하우스를 위한 주택 조건 분석
 
-
-
-##
-### 🚽 화장실 수 통합
-
-- `FullBath`, `HalfBath`, `BsmtFullBath`, `BsmtHalfBath` → `TotalFullBath`, `TotalHalfBath`
-- `HalfBath`는 0.5개로 간주 (세면대 + 변기만 있는 구조)
-
-```{python}
-our_df["TotalFullBath"] = our_df["FullBath"] + our_df["BsmtFullBath"]
-our_df["TotalHalfBath"] = 0.5 * (our_df["HalfBath"] + our_df["BsmtHalfBath"])
-```
-
-
-::: {.bath-style-grid}
-<div class="grid">
-
-<div class="item">
-  <img src="img/halfbath.png" alt="1Story" />
-</div>
-
-<div class="item">
-  <img src="img/fullbath.png" alt="1.5Fin" />
-</div>
-
-</div>
-:::
-
-<style>
-.bath-style-grid .grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-  text-align: center;
-}
-
-.bath-style-grid .item img {
-  width: 100%;
-  height: auto;
-  border-radius: 8px;
-  box-shadow: 0 0 6px rgba(0,0,0,0.1);
-}
-
-.bath-style-grid .item p {
-  margin-top: 8px;
-  font-size: 0.9rem;
-}
-</style>
-
-
-### 🏠 HouseStyle 단순화 (2층 여부 기준)
+## 
 
 - 2층 이상 구조를 `Satisfied`, 1층은 `Unsatisfied`, 나머지는 `Others`로 단순화
 - 이유: 공간 분리 및 유학생 선호 구조 반영
 - 시각자료: 아래에 집 스타일별 이미지 포함
-
 ```{python}
 def classify_style(style):
     if style in ['1.5Fin', '2Story', '2.5Fin', '2.5Unf']:
@@ -109,7 +70,7 @@ def classify_style(style):
     else:
         return 'Others'
 
-our_df["HouseStyleEval"] = our_df["HouseStyle"].apply(classify_style)
+ames["HouseStyleEval"] = ames["HouseStyle"].apply(classify_style)
 ```
 
 ::: {.house-style-grid}
@@ -179,22 +140,20 @@ our_df["HouseStyleEval"] = our_df["HouseStyle"].apply(classify_style)
 }
 </style>
 
-##
-### 
-🏫 학교와의 거리 변수 추가
-
+## 
 - `Latitude`, `Longitude`를 이용해 **Iowa State University 중심까지의 거리(`dist_to_ISU`)** 계산
 - 학업/생활의 편의성을 고려해 거리 기반 변수 추가  
 - 해당 변수는 **주거지 선택에 있어 중요한 입지 요소**로 활용될 수 있음
 - `dist_to_ISU`는 각 주택이 ISU 중심에서 **몇 km 떨어져 있는지를 나타내는 연속형 변수**로, 향후 주거 선호도 분석 등에 활용 가능
 
+## 
 ```{python}
+import plotly.express as px
 from geopy.distance import geodesic
+import numpy as np
 
 isu_lat = 42.0267
 isu_lon = -93.6465
-
-import numpy as np
 
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371.0  # Earth radius in km
@@ -206,35 +165,66 @@ def haversine(lat1, lon1, lat2, lon2):
     c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
     return R * c * 1000  # return distance in meters
 
-our_df['dist_to_ISU'] = our_df.apply(
+ames['dist_to_ISU'] = ames.apply(
     lambda row: haversine(row['Latitude'], row['Longitude'], isu_lat, isu_lon),
     axis=1
 )
 
-import seaborn as sns
-import matplotlib.pyplot as plt
+ames['TotalFullBath'] = (
+    ames['FullBath'] +
+    ames['BsmtFullBath']
+) 
+ames['TotalHalfBath'] = 0.5 * (
+    ames['HalfBath'] +
+    ames['BsmtHalfBath']
+)
 
-sns.histplot(our_df["dist_to_ISU"], kde=True)
-plt.title("Distribution of Distance to ISU")
-plt.xlabel("Distance to ISU (km)")
-plt.ylabel("Count")
-plt.show()
+ames = ames.drop(columns=['FullBath','BsmtFullBath','HalfBath','BsmtHalfBath'])
+our_columns = ['BedroomAbvGr','HeatingQC','CentralAir','HouseStyleEval',
+               '2ndFlrSF','KitchenAbvGr','KitchenQual','TotalFullBath','OverallCond',
+               'Street','dist_to_ISU','SalePrice']
+
+descriptions = {
+    'BedroomAbvGr': '지상 층에 있는 침실 수',
+    'HeatingQC': '난방 품질 및 상태 (Ex, Gd, TA, Fa 등)',
+    'CentralAir': '중앙 냉방 여부 (Y/N)',
+    'HouseStyleEval': '주택 층수 유형 평가 (Satisfied/Unsatisfied)',
+    '2ndFlrSF': '2층 면적 (제곱피트)',
+    'KitchenAbvGr': '주방 개수',
+    'KitchenQual': '주방 품질 등급',
+    'TotalFullBath': '전반적 욕실 수 (지상 + 지하)',
+    'OverallCond': '전체 상태 (1~10 등급)',
+    'Street': '접한 도로 유형 (Pave 등)',
+    'dist_to_ISU': '아이오와주립대와의 거리 (m)',
+    'SalePrice': '주택 판매가 (달러)',
+}
+
+for col in our_columns:
+    print(f"### `{col}`: {descriptions.get(col, '설명 필요')}\n")
+    
+    if ames[col].dtype != 'object':
+        fig = px.histogram(ames, x=col, nbins=30, title=f"{col} 분포")
+        fig.update_layout(height=300, margin=dict(t=40, b=40, l=10, r=10))
+        fig.show()
+    else:
+        vc = ames[col].value_counts().reset_index()
+        vc.columns = [col, 'count']
+        fig = px.bar(vc, x=col, y='count', title=f"{col} 분포")
+        fig.update_layout(height=300, margin=dict(t=40, b=40, l=10, r=10))
+        fig.show()
 ```
-
-
-
-
 
 
 # 2. EDA
 
-## 🔢 문자형 → 숫자형 처리
+## 지도시각화
 
-- `KitchenQual`, `HeatingQC`, `Street`, `CentralAir` 등
-- 범주형 → 더미 변수 또는 평준화 처리
+<iframe src="map.html" width="100%" height="600"></iframe>
+
+<iframe src="score_map.html" width="100%" height="600"></iframe>
 
 ```{python}
-our_df = pd.get_dummies(our_df, columns=['KitchenQual', 'HeatingQC', 'Street', 'CentralAir'], drop_first=True)
+ames = pd.get_dummies(ames, columns=['KitchenQual', 'HeatingQC', 'Street', 'CentralAir'], drop_first=True)
 ```
 
 
@@ -244,34 +234,38 @@ import pandas as pd
 import plotly.graph_objects as go
 
 # 데이터 불러오기
-our_df = pd.read_csv("../data/ames.csv")
+ames = pd.read_csv("../data/ames.csv")
 
 # 제외하고 싶은 컬럼
 exclude_cols = ['Longitude', 'Latitude', 'dist_to_ISU', 'GarageArea', 'PID', 'SalePrice']
 
 # 수치형 변수만 추출 + 제외 컬럼 제거
-numeric_cols = our_df.select_dtypes(include='number').columns.tolist()
+numeric_cols = ames.select_dtypes(include='number').columns.tolist()
 numeric_cols = [col for col in numeric_cols if col not in exclude_cols]
 
 # 기본 설정
+
+# y 변수 고정
+y_var = 'SalePrice'
+
+# 초기 x 변수
 x_var = numeric_cols[0]
-y_var = numeric_cols[1]
 
 fig = go.Figure()
 
 fig = fig.add_trace(
     go.Scatter(
-        x=our_df[x_var],
-        y=our_df[y_var],
+        x=ames[x_var],
+        y=ames[y_var],
         mode='markers',
         marker=dict(color='skyblue', size=8, line=dict(width=1, color='DarkSlateGrey')),
-        text=our_df['HouseStyle'],
+        text=ames['HouseStyle'],
         name=f'{x_var} vs {y_var}'
     )
 )
 
 fig.update_layout(
-    title='🏡 주요 수치형 변수 간 관계 시각화',
+    title='🏡 수치형 변수와 SalePrice 간 관계',
     template='plotly_white',
     width=750,
     height=600,
@@ -281,9 +275,13 @@ fig.update_layout(
     updatemenus=[
         dict(
             buttons=[
-                dict(label=col, method='update',
-                     args=[{'x': [our_df[col]]}, {'xaxis.title': col}])
-                for col in numeric_cols
+                dict(
+                    label=col,
+                    method='restyle',
+                    args=[
+                        {'x': [ames[col]], 'y': [ames[y_var]]}
+                    ]
+                ) for col in numeric_cols
             ],
             direction='down',
             showactive=True,
@@ -291,25 +289,10 @@ fig.update_layout(
             xanchor='left',
             y=-0.3,
             yanchor='bottom'
-        ),
-        dict(
-            buttons=[
-                dict(label=col,
-                     method='update',
-                     args=[{'y': [our_df[col]]}, {'yaxis.title': col}])
-                for col in numeric_cols
-            ],
-            direction='down',
-            showactive=True,
-            x=0.7,
-            xanchor='left',
-            y=-0.3,
-            yanchor='bottom'
         )
     ],
     annotations=[
         dict(text="📌 X 변수 선택:", x=0.05, y=-0.28, xref="paper", yref="paper", showarrow=False),
-        dict(text="📌 Y 변수 선택:", x=0.58, y=-0.28, xref="paper", yref="paper", showarrow=False)
     ]
 )
 
@@ -317,19 +300,235 @@ fig.update_layout(
 
 
 
-
-
 # 3. 회귀분석
 
+## 회귀 변수 선정 및 데이터 전처리
+
+- `SalePrice`와 상관계수가 높은 수치형 변수(0.6 이상)를 기준으로 주요 변수를 선정하였습니다.
+- 추가로, 앞서 정리한 조건들을 변수로 포함하였습니다.
+- 최종적으로 `수치형 + 범주형` 변수에 대해 표준화 및 원-핫 인코딩을 진행하고, 로그 변환된 `SalePrice`를 타겟으로 회귀 분석을 수행합니다.
+
+## 
+```{python}
+#| eval: true
+#| echo: false
+# 이미 정리한 변수 처리 및 train-test split, scaling, encoding 코드
+ames = pd.read_csv('../data/ames.csv')
+isu_lat = 42.0267
+isu_lon = -93.6465
+
+ames['dist_to_ISU'] = ames.apply(
+    lambda row: haversine(row['Latitude'], row['Longitude'], isu_lat, isu_lon),
+    axis=1
+)
+ames["HouseStyleEval"] = ames["HouseStyle"].apply(classify_style)
+
+ames['TotalFullBath'] = (
+    ames['FullBath'] +
+    ames['BsmtFullBath']
+) 
+ames['TotalHalfBath'] = 0.5 * (
+    ames['HalfBath'] +
+    ames['BsmtHalfBath']
+)
+
+ames = ames.drop(columns=['FullBath','BsmtFullBath','HalfBath','BsmtHalfBath'])
+```
+
+## 
+```{python}
+#| eval: true
+#| echo: true
+#saleprice와 상관계수가 0.6 이상인 수치형 변수 
+corr = ames.select_dtypes(include='number').corr()['SalePrice'].sort_values(ascending=False)
+corr = np.abs(corr)
+plt.figure(figsize=(10, 6))
+sns.barplot(x=corr[1:10].values, y=corr[1:10].index, orient='h')
+plt.ylabel('Feature')
+plt.show()
+```
+
+
+## 
+```{python}
+#| eval: true
+#| echo: true
+# saleprice와 상관계수가 0.6 이상인 수치형 변수 
+corr = ames.select_dtypes(include='number').corr()['SalePrice'].sort_values(ascending=False)
+
+
+selected_columns = [
+    "OverallQual",
+    "GrLivArea",
+    "TotalBsmtSF",
+    "1stFlrSF",
+    "GarageCars",
+    "GarageArea"
+]
+
+#'1stFlrSF','GarageCars' 중복 열 제거 후 우리가 생각한 변수 
+our_columns = ['BedroomAbvGr','HeatingQC','CentralAir','HouseStyleEval',
+               '2ndFlrSF','KitchenAbvGr','KitchenQual','TotalFullBath','OverallCond',
+               'Street','dist_to_ISU','SalePrice']
+
+concat_columns = selected_columns + our_columns
+ames_df = ames[concat_columns]
+
+ames_df = ames_df.dropna()
+
+
+y = np.log1p(ames_df['SalePrice'])
+ames_df = ames_df.drop(columns = 'SalePrice')
+X_train, X_test, y_train, y_test = train_test_split(ames_df,y, test_size=0.3, random_state=1234)
+
+
+num_columns = X_train.select_dtypes(include=['number']).columns
+cat_columns = X_train.select_dtypes(include=['object']).columns
+
+
+onehot = OneHotEncoder(handle_unknown='ignore', 
+                       sparse_output=False)
+X_train_cat = onehot.fit_transform(X_train[cat_columns])
+X_test_cat = onehot.transform(X_test[cat_columns])
+
+std_scaler = StandardScaler()
+X_train_num = std_scaler.fit_transform(X_train[num_columns])
+X_test_num = std_scaler.transform(X_test[num_columns])
+
+X_train_all = np.concatenate([X_train_num, X_train_cat], axis = 1)
+X_test_all = np.concatenate([X_test_num, X_test_cat], axis = 1)
+```
+
+## ElasticNet 회귀 모델 학습
+
+- **L1과 L2 정규화를 혼합한 ElasticNet 회귀모델**을 사용하여 과적합을 방지하고, 해석 가능한 회귀 계수를 도출했습니다.
+- 교차 검증 기반 그리드 서치를 통해 최적의 `alpha`, `l1_ratio` 조합을 탐색하였습니다.
+
+## 
+```{python}
+#| eval: true
+#| echo: true
+# ElasticNet 학습, GridSearchCV 코드
+
+elasticnet = ElasticNet()
+elasticnet_params = {'alpha' : np.arange(0.00001, 0.001, 0.0001),
+                  'l1_ratio': np.linspace(0, 1, 5)}
+
+# 교차검증
+from sklearn.model_selection import KFold, GridSearchCV
+cv = KFold(n_splits=5, shuffle=True, random_state=0)
+
+
+# 그리드서치
+elastic_search = GridSearchCV(estimator=elasticnet, 
+                              param_grid=elasticnet_params, 
+                              cv = cv, 
+                              scoring='neg_mean_squared_error')
+                       
+elastic_search.fit(X_train_all, y_train);
+
+```
+
+  
+## 회귀계수 시각화
+
+- 회귀모델에서 절대값 기준으로 영향력이 큰 **Top 10 변수**를 시각화하였습니다.
+- `OverallQual`, `2ndFlrSF`, `1stFlrSF` 변수가 집값에 큰 영향을 미치는 요소인 것으로 나타났습니다.
+
+##
+```{python}
+#| eval: true
+#| echo: true
+best_model = elastic_search.best_estimator_
+
+num_feature_names = num_columns.tolist()
+cat_feature_names = onehot.get_feature_names_out(cat_columns).tolist()
+
+# 최종 컬럼명 리스트 (X_train_all 기준)
+all_feature_names = num_feature_names + cat_feature_names
+
+
+coef_df = pd.DataFrame({
+    'Feature': all_feature_names,
+    'Coefficient': best_model.coef_
+})
 
 
 
-# 4. 지도 시각화
+#회귀계수 절대값 씌워서 정렬
+top_coef_idx = np.abs(coef_df['Coefficient']).sort_values(ascending=False).head(10).index
+top_coef_df = coef_df.loc[top_coef_idx]
+
+top_coef_df = top_coef_df.reindex(
+    np.abs(top_coef_df['Coefficient']).sort_values(ascending=False).index
+)
+
+top_coef_df['AbsCoefficient'] = np.abs(top_coef_df['Coefficient'])
+
+plt.figure(figsize=(10, 6))
+sns.barplot(x='AbsCoefficient', y='Feature', data=top_coef_df)
+plt.title('Top 10 Absolute Coefficients')
+plt.show()
+```
 
 
 
+# 최종 결론
 
-# 5. 최종 분석
+```{python}
+#| eval: true
+#| echo: true
+
+filtered_df = ames[
+    (ames['dist_to_ISU'] <= 2000) &
+    (ames['TotalFullBath'] >= 2) &
+    (ames['BedroomAbvGr'] >= 2) &
+    (ames['HouseStyleEval'] == 'Satisfied') &
+    (ames['1stFlrSF'] >= 1200) &
+    (ames['2ndFlrSF'] != 0) &
+    (ames['CentralAir'] == 'Y') &
+    (ames['HeatingQC'].isin(['TA', 'Gd', 'Ex'])) &
+    (ames['KitchenAbvGr'] >= 1) &
+    (ames['KitchenQual'].isin(['TA', 'Gd', 'Ex'])) &
+    (ames['GarageCars'] >= 1) &
+    (ames['OverallCond'] >= 5) &
+    (ames['Street'] == 'Pave') &
+    (ames['SalePrice'] <= 280000)
+]
+
+final_columns = ['SalePrice','OverallQual','2ndFlrSF','1stFlrSF','BedroomAbvGr','HeatingQC','CentralAir','HouseStyleEval',
+               'KitchenAbvGr','KitchenQual','OverallCond',
+               'Street','dist_to_ISU','GarageCars']
+
+
+filtered_df[final_columns].sort_values(['OverallQual','2ndFlrSF'],ascending=[False,False])
+
+```
+
+## 조건 기반 추천 결과
+
+- 회귀분석 결과와 도메인 조건을 반영하여, 다음 조건을 만족하는 **잠재적 추천 주택 리스트**를 추출하였습니다:
+
+  - ISU 중심에서 2km 이내
+  - 욕실 수 ≥ 2, 침실 수 ≥ 2
+  - 2층 구조 주택
+  - 1층 ≥ 1200sqft, 2층 존재
+  - 주방 1개 이상 + 'Gd' 이상 평가
+  - 차고 있음, 포장도로 접함, 전반적 상태 양호(≥5)
+  - 최대 가격 28만 달러 이하
+
+```python
+# filtered_df 조건 + 최종 선택
+```
+
+- 최종 추천 주택 예시 (Index: 424):
+  - 위치: Latitude 42.015805, Longitude -93.643821
+  - 회귀 분석 기반의 조건을 모두 만족하는 이상적 매물로 분류됩니다.
+
+![](img/myhouse2.jpg)
+
+
+
 
 
 
