@@ -7,10 +7,10 @@ website:
     left:
       - file: index.qmd
         text: "1. 소개 & EDA"
-      - file: map.qmd
-        text: "2. 지도 시각화"
       - file: filter.qmd
-        text: "3. 조건 필터링"
+        text: "2. 데이터 처리 과정"
+      - file: map.qmd
+        text: "3. 지도 시각화"
       - file: model.qmd
         text: "4. 회귀 분석"
       - file: final.qmd

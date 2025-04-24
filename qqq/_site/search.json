@@ -51,9 +51,9 @@
   {
     "objectID": "filter.html",
     "href": "filter.html",
-    "title": "조건 필터링 대시보드",
+    "title": "데이터 전처리 과정",
     "section": "",
-    "text": "우리 팀은 모두 유학생이에요. 현실적인 조건을 무시할 수 없죠.\n그래서 다양한 요소를 고려해 필터 슬라이더로 집을 직접 골라볼 수 있도록 만들었습니다."
+    "text": "우리 프로젝트에서 중요한 조건 중 하나는 2층 이상 구조였습니다. 하지만 HouseStyle 컬럼에는 다양한 구조가 존재했고, 이를 단순히 수치화하기에는 구조적인 차이가 너무 컸습니다. 그래서 조건 만족 여부(Satisfied / Unsatisfied / Others)로 나누어 새롭게 처리했습니다.\n\n\n\n\n\n\n\n1Story1층 구조\n\n\n\n\n\n1.5Fin1.5층, 위층 마감\n\n\n\n\n\n1.5Unf1.5층, 위층 미완공\n\n\n\n\n\n2Story전형적인 2층 집\n\n\n\n\n\n2.5Fin2.5층, 다락 마감\n\n\n\n\n\n2.5Unf2.5층, 다락 미완공\n\n\n\n\n\nSFoyerSplit Foyer 구조\n\n\n\n\n\nSLvlSplit Level 구조\n\n\n\n\n\n\n\n\n\nSatisfied: 조건을 충족하는 구조 (2층 이상 거주 공간 있음)\n\n1.5Fin, 2Story, 2.5Fin, 2.5Unf\n\nUnsatisfied: 조건을 충족하지 않음 (2층이 없거나 활용 불가능)\n\n1Story, 1.5Unf\n\nOthers: 일반적인 구조가 아니거나 애매한 경우\n\nSFoyer, SLvl\n(이 구조들은 나중에 집값 영향도 확인을 위해 따로 분류)\n\n\n\n\nCode\nimport pandas as pd\nimport folium\nfrom folium.plugins import MarkerCluster\n\ndf = pd.read_csv(\"../data/our_df2.csv\")\ndef classify_style(style):\n    if style in ['1.5Fin', '2Story', '2.5Fin', '2.5Unf']:\n        return 'Satisfied'\n    elif style in ['1Story', '1.5Unf']:\n        return 'Unsatisfied'\n    else:\n        return 'Others'\n\ndf[\"HouseStyleEval\"] = df[\"HouseStyle\"].apply(classify_style)\n\n\n이렇게 나눈 이유는 단순히 1, 2로 인코딩하는 것보다 조건 만족 여부가 직관적으로 해석 가능하고, 이후 분석(예: 가격 영향도 비교)에도 유용하기 때문입니다."
   },
   {
     "objectID": "filter.html#유학생의-현실-반영-조건을-직접-조정해보자",
@@ -131,5 +131,12 @@
     "title": "지도 기반 시각화",
     "section": "",
     "text": "조건을 만족하는 집은 많지만, 위치는 우리에게 정말 중요해요.\n아래 세 가지 기준을 중심으로 지도 시각화를 진행했습니다."
+  },
+  {
+    "objectID": "filter.html#housestyle-컬럼-전처리",
+    "href": "filter.html#housestyle-컬럼-전처리",
+    "title": "데이터 전처리 과정",
+    "section": "",
+    "text": "우리 프로젝트에서 중요한 조건 중 하나는 2층 이상 구조였습니다. 하지만 HouseStyle 컬럼에는 다양한 구조가 존재했고, 이를 단순히 수치화하기에는 구조적인 차이가 너무 컸습니다. 그래서 조건 만족 여부(Satisfied / Unsatisfied / Others)로 나누어 새롭게 처리했습니다.\n\n\n\n\n\n\n\n1Story1층 구조\n\n\n\n\n\n1.5Fin1.5층, 위층 마감\n\n\n\n\n\n1.5Unf1.5층, 위층 미완공\n\n\n\n\n\n2Story전형적인 2층 집\n\n\n\n\n\n2.5Fin2.5층, 다락 마감\n\n\n\n\n\n2.5Unf2.5층, 다락 미완공\n\n\n\n\n\nSFoyerSplit Foyer 구조\n\n\n\n\n\nSLvlSplit Level 구조\n\n\n\n\n\n\n\n\n\nSatisfied: 조건을 충족하는 구조 (2층 이상 거주 공간 있음)\n\n1.5Fin, 2Story, 2.5Fin, 2.5Unf\n\nUnsatisfied: 조건을 충족하지 않음 (2층이 없거나 활용 불가능)\n\n1Story, 1.5Unf\n\nOthers: 일반적인 구조가 아니거나 애매한 경우\n\nSFoyer, SLvl\n(이 구조들은 나중에 집값 영향도 확인을 위해 따로 분류)\n\n\n\n\nCode\nimport pandas as pd\nimport folium\nfrom folium.plugins import MarkerCluster\n\ndf = pd.read_csv(\"../data/our_df2.csv\")\ndef classify_style(style):\n    if style in ['1.5Fin', '2Story', '2.5Fin', '2.5Unf']:\n        return 'Satisfied'\n    elif style in ['1Story', '1.5Unf']:\n        return 'Unsatisfied'\n    else:\n        return 'Others'\n\ndf[\"HouseStyleEval\"] = df[\"HouseStyle\"].apply(classify_style)\n\n\n이렇게 나눈 이유는 단순히 1, 2로 인코딩하는 것보다 조건 만족 여부가 직관적으로 해석 가능하고, 이후 분석(예: 가격 영향도 비교)에도 유용하기 때문입니다."
   }
 ]

@@ -1,68 +1,115 @@
 ---
-title: "조건 필터링 대시보드"
+title: "데이터 전처리 과정"
 format:
   html:
     theme: cosmo
     toc: true
     toc-depth: 2
-    code-tools: true
     code-fold: true
 ---
 
-## 🔍 유학생의 현실 반영! 조건을 직접 조정해보자
+## 1. 🧹 HouseStyle 컬럼 전처리
 
-우리 팀은 모두 유학생이에요. 현실적인 조건을 무시할 수 없죠.  
-그래서 다양한 요소를 고려해 **필터 슬라이더로 집을 직접 골라볼 수 있도록** 만들었습니다.
+우리 프로젝트에서 중요한 조건 중 하나는 **2층 이상 구조**였습니다. 
+하지만 `HouseStyle` 컬럼에는 다양한 구조가 존재했고, 이를 단순히 수치화하기에는 구조적인 차이가 너무 컸습니다. 
+그래서 **조건 만족 여부(Satisfied / Unsatisfied / Others)**로 나누어 새롭게 처리했습니다.
 
----
+### 🏠 HouseStyle 종류와 의미
+::: {.house-style-grid}
+<div class="grid">
 
-## 📌 사용 방법
+<div class="item">
+  <img src="img/1story.png" alt="1Story" />
+  <p><strong>1Story</strong><br>1층 구조</p>
+</div>
 
-슬라이더를 조정하면 조건에 맞는 집만 표시됩니다.  
-가장 적합한 집을 빠르게 찾는 데 큰 도움이 돼요.
+<div class="item">
+  <img src="img/1_5fin.png" alt="1.5Fin" />
+  <p><strong>1.5Fin</strong><br>1.5층, 위층 마감</p>
+</div>
+
+<div class="item">
+  <img src="img/1_5unf.png" alt="1.5Unf" />
+  <p><strong>1.5Unf</strong><br>1.5층, 위층 미완공</p>
+</div>
+
+<div class="item">
+  <img src="img/2story.png" alt="2Story" />
+  <p><strong>2Story</strong><br>전형적인 2층 집</p>
+</div>
+
+<div class="item">
+  <img src="img/2_5fin.png" alt="2.5Fin" />
+  <p><strong>2.5Fin</strong><br>2.5층, 다락 마감</p>
+</div>
+
+<div class="item">
+  <img src="./img/2_unf.png" alt="2.5Unf" />
+  <p><strong>2.5Unf</strong><br>2.5층, 다락 미완공</p>
+</div>
+
+<div class="item">
+  <img src="img/sfoyer.png" alt="SFoyer" />
+  <p><strong>SFoyer</strong><br>Split Foyer 구조</p>
+</div>
+
+<div class="item">
+  <img src="img/slvl.png" alt="SLvl" />
+  <p><strong>SLvl</strong><br>Split Level 구조</p>
+</div>
+
+</div>
+
+<style>
+.house-style-grid .grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  text-align: center;
+}
+
+.house-style-grid .item img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 0 6px rgba(0,0,0,0.1);
+}
+
+.house-style-grid .item p {
+  margin-top: 8px;
+  font-size: 0.9rem;
+}
+</style>
+
+:::
+
+### ✅ 조건 분류 기준
+
+- **Satisfied**: 조건을 충족하는 구조 (2층 이상 거주 공간 있음)
+    - `1.5Fin`, `2Story`, `2.5Fin`, `2.5Unf`
+- **Unsatisfied**: 조건을 충족하지 않음 (2층이 없거나 활용 불가능)
+    - `1Story`, `1.5Unf`
+- **Others**: 일반적인 구조가 아니거나 애매한 경우
+    - `SFoyer`, `SLvl`
+    - (이 구조들은 나중에 집값 영향도 확인을 위해 따로 분류)
 
 ```{python}
-import streamlit as st
+# 예시 코드
 import pandas as pd
+import folium
+from folium.plugins import MarkerCluster
 
 df = pd.read_csv("../data/our_df2.csv")
+def classify_style(style):
+    if style in ['1.5Fin', '2Story', '2.5Fin', '2.5Unf']:
+        return 'Satisfied'
+    elif style in ['1Story', '1.5Unf']:
+        return 'Unsatisfied'
+    else:
+        return 'Others'
 
-st.title("🏠 조건 필터링으로 집 찾기")
-
-st.markdown("📌 **슬라이더를 조정하면 조건에 맞는 집만 표시됩니다.**")
-
-# 슬라이더 UI
-dist_limit = st.slider("🏫 학교와의 거리 제한 (m)", 0, 5000, 2000, step=100)
-min_bedroom = st.slider("🛏️ 최소 방 개수", 1, 6, 3)
-min_bath = st.slider("🛁 최소 욕실 수", 1.0, 4.0, 2.0, step=0.5)
-garage_required = st.checkbox("🚗 차고 필요", value=True)
-
-# 필터 적용
-filtered = df[
-    (df['dist_to_ISU'] <= dist_limit) &
-    (df['BedroomAbvGr'] >= min_bedroom) &
-    (df['TotalFullBath'] >= min_bath)
-]
-if garage_required:
-    filtered = filtered[df['GarageCars'] > 0]
-
-st.dataframe(filtered.sort_values(by='dist_to_ISU').head(10))
+df["HouseStyleEval"] = df["HouseStyle"].apply(classify_style)
 ```
 
-🎯 조건 기준 예시 설명
-📍 dist_to_ISU <= 2000: 학교 반경 2km 이내
-
-🛏️ BedroomAbvGr >= 3: 3인 이상 함께 살 수 있는 방 개수
-
-🛁 TotalFullBath >= 2: 성별 구분을 위한 최소 욕실 2개
-
-🚗 GarageCars > 0: 차가 있으므로 차고 필수!
-
-✅ 필터링 결과 예시
-조건을 충족한 집 10개를 예시로 출력합니다.
-
-
-방 개수	욕실 수	차고 대수	차고 면적	학교 거리 (m)
-...	...	...	...	...
-💡 이 필터 기능을 사용하면 여러 후보 중 가장 조건에 맞는 집을 빠르게 탐색할 수 있어요!
+이렇게 나눈 이유는 단순히 1, 2로 인코딩하는 것보다 **조건 만족 여부가 직관적으로 해석 가능하고**, 이후 분석(예: 가격 영향도 비교)에도 유용하기 때문입니다. 
 
